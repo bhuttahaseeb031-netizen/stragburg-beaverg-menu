@@ -9,6 +9,7 @@ Original file is located at
 # Starbucks Dataset: EDA, Data Splitting, and Modeling
 """
 
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,12 +20,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 # Load the dataset
-df = pd.read_csv('/content/starbucks.csv')
+df = pd.read_csv('starbucks.csv')
 
 # Inspect the first few rows and column information
-print("Dataset Shape:", df.shape)
-display(df.head())
-print(df.info())
+st.write("Dataset Shape:", df.shape)
+st.dataframe(df.head())
 
 """## Exploratory Data Analysis (EDA)
 We will clean column names, handle missing values, and visualize the correlations and distributions of numeric features.
@@ -32,154 +32,3 @@ We will clean column names, handle missing values, and visualize the correlation
 
 # Clean column names (strip whitespace)
 df.columns = df.columns.str.strip()
-
-# Handle missing values if any
-df = df.dropna()
-
-# Identify numeric columns for analysis
-numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-print("Numeric columns:", numeric_cols)
-
-# Summary statistics
-display(df.describe())
-
-# Visualizing distributions of key numeric features
-plt.figure(figsize=(12, 5))
-for i, col in enumerate(numeric_cols[:3], 1):
-    plt.subplot(1, 3, i)
-    sns.histplot(df[col], kde=True)
-    plt.title(f'Distribution of {col}')
-plt.tight_layout()
-plt.show()
-
-"""### Additional Visualizations (Pie Chart & Correlation Heatmap)"""
-
-# 1. Pie Graph of Beverage Categories (Top 7 categories + Others)
-category_counts = df['Beverage_category'].value_counts()
-if len(category_counts) > 7:
-    top_categories = category_counts.head(6)
-    other_sum = pd.Series([category_counts.iloc[6:].sum()], index=['Other'])
-    pie_data = pd.concat([top_categories, other_sum])
-else:
-    pie_data = category_counts
-
-plt.figure(figsize=(8, 8))
-plt.pie(pie_data, labels=pie_data.index, autopct='%1.1f%%', startangle=140, colors=sns.color_palette('pastel'))
-plt.title('Distribution of Beverage Categories')
-plt.show()
-
-# 2. Heatmap showing correlations between nutritional values
-plt.figure(figsize=(10, 8))
-correlation_matrix = df[numeric_cols].corr()
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
-plt.title('Correlation Matrix of Nutritional Features')
-plt.show()
-
-"""## Data Splitting and Feature Engineering
-We will define our target variable (e.g., the first numeric column, which is usually Calories in this dataset) and split the data.
-"""
-
-# Assume the first numeric column is the target (typically 'Calories' or similar)
-target_col = numeric_cols[0]
-feature_cols = [col for col in numeric_cols if col != target_col]
-
-X = df[feature_cols]
-y = df[target_col]
-
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Standardize features
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-print(f"Training set shape: {X_train.shape}")
-print(f"Testing set shape: {X_test.shape}")
-
-"""## Model Development and Evaluation
-We will train a Random Forest Regressor and evaluate its performance on the test set.
-"""
-
-# Initialize and train the model
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train_scaled, y_train)
-
-# Predict and evaluate
-y_pred = model.predict(X_test_scaled)
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
-
-print(f"Mean Squared Error: {mse:.2f}")
-print(f"R2 Score: {r2:.2f}")
-
-# Plot Actual vs Predicted
-plt.figure(figsize=(6, 6))
-plt.scatter(y_test, y_pred, alpha=0.7)
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-plt.xlabel('Actual')
-plt.ylabel('Predicted')
-plt.title(f'Actual vs Predicted {target_col}')
-plt.show()
-
-"""## Decision Tree Model Development and Evaluation
-We will now train a Decision Tree Regressor on the scaled training data and measure its performance.
-"""
-
-from sklearn.tree import DecisionTreeRegressor
-
-# Initialize and train the Decision Tree Regressor
-dt_model = DecisionTreeRegressor(random_state=42)
-dt_model.fit(X_train_scaled, y_train)
-
-# Predict on test data
-dt_y_pred = dt_model.predict(X_test_scaled)
-
-# Calculate accuracy metrics
-dt_mse = mean_squared_error(y_test, dt_y_pred)
-dt_r2 = r2_score(y_test, dt_y_pred)
-
-print(f"Decision Tree Mean Squared Error: {dt_mse:.2f}")
-print(f"Decision Tree R2 Score (Accuracy): {dt_r2:.2f}")
-
-# Compare both models
-models_comparison = pd.DataFrame({
-    'Model': ['Random Forest', 'Decision Tree'],
-    'MSE': [mse, dt_mse],
-    'R2 Score': [r2, dt_r2]
-})
-
-display(models_comparison)
-
-# Plot actual vs predicted for the Decision Tree model
-plt.figure(figsize=(6, 6))
-plt.scatter(y_test, dt_y_pred, alpha=0.7, color='green')
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-plt.xlabel('Actual')
-plt.ylabel('Predicted')
-plt.title('Actual vs Predicted Calories (Decision Tree)')
-plt.show()
-
-"""## Download Trained Models
-We will save the trained models (`model` for Random Forest and `dt_model` for Decision Tree) along with the `scaler` using `joblib` and download them.
-"""
-
-import joblib
-from google.colab import files
-import zipfile
-import os
-
-# Save the models and scaler to files
-joblib.dump(model, 'random_forest_model.joblib')
-joblib.dump(dt_model, 'decision_tree_model.joblib')
-joblib.dump(scaler, 'scaler.joblib')
-
-# Compress saved files into a single zip archive
-zip_filename = 'starbucks_models.zip'
-with zipfile.ZipFile(zip_filename, 'w') as zip_f:
-    zip_f.write('random_forest_model.joblib')
-    zip_f.write('decision_tree_model.joblib')
-    zip_f.write('scaler.joblib')
-
-# Trigger the download
-files.download(zip_filename)
